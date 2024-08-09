@@ -22,6 +22,17 @@ def download_video():
         return jsonify({'error': 'No URL provided'}), 400
 
     video_filename = None
+    progress_data = {'percent': 0}  # Placeholder for progress tracking
+
+    def progress_hook(d):
+        nonlocal video_filename, progress_data
+        if d['status'] == 'finished':
+            video_filename = d['filename']
+        elif d['status'] == 'downloading':
+            # Calculate progress if available
+            if 'downloaded_bytes' in d and 'total_bytes' in d:
+                progress_data['percent'] = int(d['downloaded_bytes'] / d['total_bytes'] * 100)
+        # Add any additional progress tracking here
 
     # Set up yt-dlp options
     ydl_opts = {
@@ -30,12 +41,6 @@ def download_video():
         'cookiefile': './cookies.txt',  # Ensure this path is correct
         'progress_hooks': [progress_hook],  # Hook for progress updates
     }
-
-    def progress_hook(d):
-        nonlocal video_filename
-        if d['status'] == 'finished':
-            video_filename = d['filename']
-        # Add progress tracking logic if needed
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -53,7 +58,7 @@ def download_video():
             return response
 
         video_url = f'/serve_video/{os.path.basename(video_filename)}'
-        return jsonify({'video_url': video_url})
+        return jsonify({'video_url': video_url, 'progress': progress_data})
 
     except yt_dlp.utils.DownloadError as e:
         return jsonify({'error': str(e)}), 400
@@ -73,7 +78,7 @@ def serve_video(filename):
 def get_progress():
     # Dummy progress endpoint for demonstration purposes
     # Replace with actual progress tracking if needed
-    progress = {"percent": 75}  # Example static progress
+    progress = {"percent": 0}  # Default progress
     return jsonify(progress)
 
 if __name__ == '__main__':
