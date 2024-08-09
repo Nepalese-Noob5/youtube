@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, after_this_request, make_response
+from flask import Flask, request, jsonify, send_file, after_this_request
 import yt_dlp
 import os
 
@@ -19,7 +19,7 @@ def download_from_youtube(url):
         info_dict = ydl.extract_info(url, download=True)
         video_title = info_dict.get('title', None)
         video_ext = info_dict.get('ext', None)
-        video_file_path = f"{DOWNLOAD_DIRECTORY}/{video_title}.{video_ext}"
+        video_file_path = os.path.join(DOWNLOAD_DIRECTORY, f"{video_title}.{video_ext}")
         return video_file_path
 
 @app.route('/download', methods=['POST'])
@@ -38,10 +38,6 @@ def download_video():
         # Construct the full URL for the downloaded video
         video_url = request.host_url + 'static/' + os.path.basename(video_file_path)
 
-        # Set a cookie with the video URL
-        resp = make_response(jsonify({"video_url": video_url}))
-        resp.set_cookie('last_downloaded_video', video_url, max_age=60*60)  # Cookie expires in 1 hour
-
         @after_this_request
         def remove_file(response):
             try:
@@ -50,14 +46,19 @@ def download_video():
                 print(f"Error removing or closing downloaded file handle: {error}")
             return response
 
-        return resp
+        return jsonify({"video_url": video_url})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/static/<filename>')
 def serve_video(filename):
-    return send_file(os.path.join(DOWNLOAD_DIRECTORY, filename))
+    file_path = os.path.join(DOWNLOAD_DIRECTORY, filename)
+    if os.path.exists(file_path):
+        return send_file(file_path)
+    else:
+        return jsonify({"error": "File not found"}), 404
 
 if __name__ == '__main__':
-    app.run(debug=True, host="0.0.0.0")
+    port = int(os.environ.get('PORT', 5000))  # Ensure compatibility with platforms like Render
+    app.run(debug=True, host="0.0.0.0", port=port)
