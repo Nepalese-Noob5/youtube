@@ -1,19 +1,8 @@
-from flask import Flask, request, jsonify, send_file, after_this_request, Response
-import yt_dlp
+from flask import Flask, request, jsonify
+import youtube_dl
 import os
 
 app = Flask(__name__)
-
-# Directory to save downloaded videos
-DOWNLOAD_DIRECTORY = "./downloads"
-
-# Ensure the download directory exists
-if not os.path.exists(DOWNLOAD_DIRECTORY):
-    os.makedirs(DOWNLOAD_DIRECTORY)
-
-@app.route('/')
-def index():
-    return "Welcome to the YouTube Downloader!"
 
 @app.route('/download', methods=['POST'])
 def download_video():
@@ -21,65 +10,32 @@ def download_video():
     if not url:
         return jsonify({'error': 'No URL provided'}), 400
 
-    video_filename = None
-    progress_data = {'percent': 0}  # Placeholder for progress tracking
-
     def progress_hook(d):
-        nonlocal video_filename, progress_data
         if d['status'] == 'finished':
-            video_filename = d['filename']
-        elif d['status'] == 'downloading':
-            # Calculate progress if available
-            if 'downloaded_bytes' in d and 'total_bytes' in d:
-                progress_data['percent'] = int(d['downloaded_bytes'] / d['total_bytes'] * 100)
-        # Add any additional progress tracking here
+            # Save the progress information
+            with open('/tmp/progress.txt', 'w') as f:
+                f.write(f"Download completed: {d['filename']}")
 
-    # Set up yt-dlp options
     ydl_opts = {
-        'outtmpl': os.path.join(DOWNLOAD_DIRECTORY, '%(title)s.%(ext)s'),
-        'format': 'bestvideo+bestaudio/best',
-        'cookiefile': './cookies.txt',  # Ensure this path is correct
+        'outtmpl': './downloads/%(title)s.%(ext)s',
         'progress_hooks': [progress_hook],  # Hook for progress updates
     }
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
-
-        if not video_filename or not os.path.exists(video_filename):
-            return jsonify({'error': 'Video download failed'}), 500
-
-        @after_this_request
-        def remove_file(response):
-            try:
-                os.remove(video_filename)
-            except Exception as error:
-                print(f"Error removing file {video_filename}: {error}")
-            return response
-
-        video_url = f'/serve_video/{os.path.basename(video_filename)}'
-        return jsonify({'video_url': video_url, 'progress': progress_data})
-
-    except yt_dlp.utils.DownloadError as e:
-        return jsonify({'error': str(e)}), 400
-
+        return jsonify({'message': 'Download started'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/serve_video/<filename>')
-def serve_video(filename):
-    video_path = os.path.join(DOWNLOAD_DIRECTORY, filename)
-    if os.path.exists(video_path):
-        return send_file(video_path)
-    else:
-        return "Video not found", 404
-
-@app.route('/progress')
+@app.route('/progress', methods=['GET'])
 def get_progress():
-    # Dummy progress endpoint for demonstration purposes
-    # Replace with actual progress tracking if needed
-    progress = {"percent": 0}  # Default progress
-    return jsonify(progress)
+    if os.path.exists('/tmp/progress.txt'):
+        with open('/tmp/progress.txt', 'r') as f:
+            progress = f.read()
+        return jsonify({'progress': progress}), 200
+    else:
+        return jsonify({'progress': 'No download progress available'}), 200
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)
