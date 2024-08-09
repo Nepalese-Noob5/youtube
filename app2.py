@@ -21,6 +21,7 @@ def download_video():
     ydl_opts = {
         'outtmpl': './downloads/%(title)s.%(ext)s',
         'progress_hooks': [progress_hook],  # Hook for progress updates
+        'cookiefile': 'cookies.txt',  # Path to your cookies.txt file
     }
 
     try:

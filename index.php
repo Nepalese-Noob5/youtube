@@ -23,7 +23,7 @@
             }
 
             try {
-                const response = await fetch('http://your-server-address/download', {  // Replace 'your-server-address' with your Render app's address
+                const response = await fetch('https://youtube-c6ei.onrender.com/download', {  // Replace 'your-server-address' with your Render app's address
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: `url=${encodeURIComponent(url)}`
@@ -43,7 +43,7 @@
 
         async function checkProgress() {
             try {
-                const response = await fetch('http://your-server-address/progress');  // Replace 'your-server-address' with your Render app's address
+                const response = await fetch('https://youtube-c6ei.onrender.com/progress');  // Replace 'your-server-address' with your Render app's address
                 if (response.ok) {
                     const data = await response.json();
                     document.getElementById('progress').innerText = data.progress || 'No progress available';
