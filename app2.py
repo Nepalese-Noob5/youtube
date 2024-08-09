@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
-import yt_dlp as youtube_dl  # Update to use yt-dlp
+from flask_cors import CORS  # To enable CORS
+import yt_dlp as youtube_dl
 import os
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 @app.route('/download', methods=['POST'])
 def download_video():
