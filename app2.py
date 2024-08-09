@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-import youtube_dl
+import yt_dlp as youtube_dl  # Update to use yt-dlp
 import os
 
 app = Flask(__name__)
