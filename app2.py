@@ -4,57 +4,54 @@ import os
 
 app = Flask(__name__)
 
-# Directory to store downloaded videos
+# Directory to save downloaded videos
 DOWNLOAD_DIRECTORY = "./downloads"
 
+# Ensure the download directory exists
 if not os.path.exists(DOWNLOAD_DIRECTORY):
     os.makedirs(DOWNLOAD_DIRECTORY)
 
-def download_from_youtube(url):
-    ydl_opts = {
-        'outtmpl': os.path.join(DOWNLOAD_DIRECTORY, '%(title)s.%(ext)s'),
-        'format': 'bestvideo+bestaudio/best',
-        'cookiefile': 'cookies.txt',  # Ensure the path to cookies.txt is correct
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info_dict = ydl.extract_info(url, download=True)
-        video_title = info_dict.get('title', None)
-        video_ext = info_dict.get('ext', None)
-        video_file_path = os.path.join(DOWNLOAD_DIRECTORY, f"{video_title}.{video_ext}")
-        return video_file_path
+@app.route('/')
+def index():
+    return "Welcome to the YouTube Downloader!"
 
 @app.route('/download', methods=['POST'])
 def download_video():
-    url = request.form.get('url')
-
-    if not url:
-        return jsonify({"error": "No URL provided"}), 400
-
     try:
-        video_file_path = download_from_youtube(url)
+        url = request.form.get('url')
+        if not url:
+            return jsonify({'error': 'No URL provided'}), 400
+        
+        # Set up yt-dlp options
+        ydl_opts = {
+            'outtmpl': os.path.join(DOWNLOAD_DIRECTORY, '%(title)s.%(ext)s'),
+            'format': 'bestvideo+bestaudio/best',
+            'cookiefile': './cookies.txt',  # Ensure this path is correct
+        }
 
-        if not os.path.exists(video_file_path):
-            return jsonify({"error": "Video not found or download failed."}), 400
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(url, download=True)
+            video_title = info_dict.get('title', None)
+            video_filename = ydl.prepare_filename(info_dict)
 
-        # Construct the full URL for the downloaded video
-        video_url = request.host_url + 'static/' + os.path.basename(video_file_path)
+        if not video_title or not os.path.exists(video_filename):
+            return jsonify({'error': 'Video download failed'}), 500
 
         @after_this_request
         def remove_file(response):
             try:
-                os.remove(video_file_path)
+                os.remove(video_filename)
             except Exception as error:
-                print(f"Error removing or closing downloaded file handle: {error}")
+                print(f"Error removing file {video_filename}: {error}")
             return response
 
-        return jsonify({"video_url": video_url})
+        return send_file(video_filename, as_attachment=True)
+
+    except yt_dlp.utils.DownloadError as e:
+        return jsonify({'error': str(e)}), 400
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/static/<filename>')
-def serve_video(filename):
-    return send_file(os.path.join(DOWNLOAD_DIRECTORY, filename))
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host="0.0.0.0")
+    app.run(debug=True, host='0.0.0.0', port=5000)
