@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, after_this_request
+from flask import Flask, request, jsonify, send_file, after_this_request, make_response
 import yt_dlp
 import os
 
@@ -25,19 +25,23 @@ def download_from_youtube(url):
 @app.route('/download', methods=['POST'])
 def download_video():
     url = request.form.get('url')
-    
+
     if not url:
         return jsonify({"error": "No URL provided"}), 400
 
     try:
         video_file_path = download_from_youtube(url)
-        
+
         if not os.path.exists(video_file_path):
             return jsonify({"error": "Video not found or download failed."}), 400
-        
+
         # Construct the full URL for the downloaded video
         video_url = request.host_url + 'static/' + os.path.basename(video_file_path)
-        
+
+        # Set a cookie with the video URL
+        resp = make_response(jsonify({"video_url": video_url}))
+        resp.set_cookie('last_downloaded_video', video_url, max_age=60*60)  # Cookie expires in 1 hour
+
         @after_this_request
         def remove_file(response):
             try:
@@ -45,9 +49,9 @@ def download_video():
             except Exception as error:
                 print(f"Error removing or closing downloaded file handle: {error}")
             return response
-        
-        return jsonify({"video_url": video_url})
-    
+
+        return resp
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
