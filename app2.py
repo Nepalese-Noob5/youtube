@@ -11,6 +11,7 @@ logging.basicConfig(filename='app.log', level=logging.INFO, format='%(asctime)s 
 
 DOWNLOAD_FOLDER = './downloads'
 VALID_LINKS_FILE = './valid_links.txt'
+COOKIES_FILE = './cookies.txt'
 
 @app.route('/download', methods=['POST'])
 def download_video():
@@ -20,13 +21,17 @@ def download_video():
         return jsonify({'error': 'No key provided'}), 400
 
     # Retrieve URL using the provided key
-    with open(VALID_LINKS_FILE, 'r') as file:
-        lines = file.readlines()
     url = None
-    for line in lines:
-        if line.startswith(f"{key}="):
-            url = line.split('=')[1].strip()
-            break
+    try:
+        with open(VALID_LINKS_FILE, 'r') as file:
+            lines = file.readlines()
+            for line in lines:
+                if line.startswith(f"{key}="):
+                    url = line.split('=')[1].strip()
+                    break
+    except Exception as e:
+        logging.error(f"Error reading valid links file: {str(e)}")
+        return jsonify({'error': 'Error reading valid links file'}), 500
 
     if not url:
         logging.error(f"No video found for the given key: {key}.")
@@ -42,7 +47,7 @@ def download_video():
     ydl_opts = {
         'outtmpl': f'{DOWNLOAD_FOLDER}/%(title)s.%(ext)s',
         'progress_hooks': [progress_hook],
-        'cookiefile': './cookies.txt',
+        'cookiefile': COOKIES_FILE,
     }
 
     # Retry mechanism to handle HTTP 429
